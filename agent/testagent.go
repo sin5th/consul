@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/agent/config"
-	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/dns"
+	"github.com/hashicorp/consul/agent/rpc"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/logger"
@@ -254,7 +254,7 @@ func (a *TestAgent) DNSDisableCompression(b bool) {
 	}
 }
 
-func (a *TestAgent) consulConfig() *consul.Config {
+func (a *TestAgent) consulConfig() *rpc.Config {
 	c, err := a.Agent.consulConfig()
 	if err != nil {
 		panic(err)
@@ -317,7 +317,7 @@ func TestConfig() *config.Config {
 	cfg.Bootstrap = true
 	cfg.Server = true
 
-	ccfg := consul.DefaultConfig()
+	ccfg := rpc.DefaultConfig()
 	cfg.ConsulConfig = ccfg
 
 	ccfg.SerfLANConfig.MemberlistConfig.SuspicionMult = 3

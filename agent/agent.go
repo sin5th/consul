@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/agent/config"
-	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/dns"
+	"github.com/hashicorp/consul/agent/rpc"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/agent/systemd"
 	"github.com/hashicorp/consul/agent/token"
@@ -57,7 +57,7 @@ const (
 var dnsNameRe = regexp.MustCompile(`^[a-zA-Z0-9\-]+$`)
 
 // delegate defines the interface shared by both
-// consul.Client and consul.Server.
+// rpc.Client and rpc.Server.
 type delegate interface {
 	Encrypted() bool
 	GetLANCoordinate() (*coordinate.Coordinate, error)
@@ -96,7 +96,7 @@ type Agent struct {
 	// Used for streaming logs to
 	LogWriter *logger.LogWriter
 
-	// delegate is either a *consul.Server or *consul.Client
+	// delegate is either a *rpc.Server or *rpc.Client
 	// depending on the configuration
 	delegate delegate
 
@@ -268,7 +268,7 @@ func (a *Agent) Start() error {
 
 	// Setup either the client or the server.
 	if c.Server {
-		server, err := consul.NewServerLogger(consulCfg, a.logger)
+		server, err := rpc.NewServerLogger(consulCfg, a.logger)
 		if err != nil {
 			return fmt.Errorf("Failed to start Consul server: %v", err)
 		}
@@ -276,7 +276,7 @@ func (a *Agent) Start() error {
 		a.delegate = server
 		a.state.delegate = server
 	} else {
-		client, err := consul.NewClientLogger(consulCfg, a.logger)
+		client, err := rpc.NewClientLogger(consulCfg, a.logger)
 		if err != nil {
 			return fmt.Errorf("Failed to start Consul client: %v", err)
 		}
@@ -574,15 +574,15 @@ func (a *Agent) reloadWatches(cfg *config.Config) error {
 }
 
 // consulConfig is used to return a consul configuration
-func (a *Agent) consulConfig() (*consul.Config, error) {
+func (a *Agent) consulConfig() (*rpc.Config, error) {
 	// Start with the provided config or default config
-	base := consul.DefaultConfig()
+	base := rpc.DefaultConfig()
 
 	// a.config.ConsulConfig, if set, is a partial configuration for the
 	// consul server or client. Therefore, clone and augment it but
 	// don't use it as base directly.
 	if a.config.ConsulConfig != nil {
-		base = new(consul.Config)
+		base = new(rpc.Config)
 		*base = *a.config.ConsulConfig
 	}
 
@@ -903,7 +903,7 @@ func (a *Agent) setupNodeID(cfg *config.Config) error {
 }
 
 // setupKeyrings is used to initialize and load keyrings during agent startup
-func (a *Agent) setupKeyrings(config *consul.Config) error {
+func (a *Agent) setupKeyrings(config *rpc.Config) error {
 	// If the keyring file is disabled then just poke the provided key
 	// into the in-memory keyring.
 	if a.config.DisableKeyringFile {
@@ -967,7 +967,7 @@ LOAD:
 // name. This allows overwriting handlers for the golang net/rpc
 // service which does not allow this.
 func (a *Agent) RegisterEndpoint(name string, handler interface{}) error {
-	srv, ok := a.delegate.(*consul.Server)
+	srv, ok := a.delegate.(*rpc.Server)
 	if !ok {
 		panic("agent must be a server")
 	}
@@ -1041,7 +1041,7 @@ func (a *Agent) ShutdownAgent() error {
 	var err error
 	if a.delegate != nil {
 		err = a.delegate.Shutdown()
-		if _, ok := a.delegate.(*consul.Server); ok {
+		if _, ok := a.delegate.(*rpc.Server); ok {
 			a.logger.Print("[INFO] agent: consul server down")
 		} else {
 			a.logger.Print("[INFO] agent: consul client down")
@@ -1125,7 +1125,7 @@ func (a *Agent) JoinLAN(addrs []string) (n int, err error) {
 // JoinWAN is used to have the agent join a WAN cluster
 func (a *Agent) JoinWAN(addrs []string) (n int, err error) {
 	a.logger.Printf("[INFO] agent: (WAN) joining: %v", addrs)
-	if srv, ok := a.delegate.(*consul.Server); ok {
+	if srv, ok := a.delegate.(*rpc.Server); ok {
 		n, err = srv.JoinWAN(addrs)
 	} else {
 		err = fmt.Errorf("Must be a server to join WAN cluster")
@@ -1156,7 +1156,7 @@ func (a *Agent) LANMembers() []serf.Member {
 
 // WANMembers is used to retrieve the WAN members
 func (a *Agent) WANMembers() []serf.Member {
-	if srv, ok := a.delegate.(*consul.Server); ok {
+	if srv, ok := a.delegate.(*rpc.Server); ok {
 		return srv.WANMembers()
 	}
 	return nil
@@ -1197,7 +1197,7 @@ func (a *Agent) sendCoordinate() {
 		select {
 		case <-time.After(intv):
 			members := a.LANMembers()
-			grok, err := consul.CanServersUnderstandProtocol(members, 3)
+			grok, err := rpc.CanServersUnderstandProtocol(members, 3)
 			if err != nil {
 				a.logger.Printf("[ERR] agent: Failed to check servers: %s", err)
 				continue
