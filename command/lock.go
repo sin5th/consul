@@ -97,7 +97,7 @@ func (c *LockCommand) run(args []string, lu **LockUnlock) int {
 			"required to detect a lost lock in some cases. The default value is 3, "+
 			"with a 1s wait between retries. Set this value to 0 to disable retires.")
 	f.StringVar(&name, "name", "",
-		"Optional name to associate with the lock session. It not provided, one "+
+		"Optional name to associate with the lock session. If not provided, one "+
 			"is generated based on the provided child command.")
 	f.BoolVar(&passStdin, "pass-stdin", false,
 		"Pass stdin to the child process.")
